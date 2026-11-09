@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { sendFeedback } from "@/lib/feedback.functions";
+import { validateFeedbackPassword } from "@/lib/feedback.functions";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -333,86 +333,252 @@ function ModuleDetail({ m }: { m: Module }) {
   );
 }
 
+
 function Feedback() {
-  const send = useServerFn(sendFeedback);
+  const validate = useServerFn(validateFeedbackPassword);
+
   const [message, setMessage] = useState("");
+  const [stars, setStars] = useState(0);
+  const [hover, setHover] = useState(0);
+
+  const chips = [
+    "👏 Sterk gedaan",
+    "💡 Goede reflectie",
+    "🗣️ Werk aan communicatie",
+    "🚀 Breng het echt uit!",
+  ];
+
+  const [state, setState] = useState<{
+    status: "idle" | "sending" | "done" | "error";
+    msg?: string;
+  }>({ status: "idle" });
+
   useEffect(() => {
-    const on = (e: Event) => setMessage((m) => (m ? m + "\n\n" : "") + (e as CustomEvent<string>).detail);
+    const on = (e: Event) =>
+      setMessage((m) =>
+        (m ? m + "\n\n" : "") + (e as CustomEvent<string>).detail
+      );
+
     window.addEventListener("pgp-quote", on);
     return () => window.removeEventListener("pgp-quote", on);
   }, []);
-  const [stars, setStars] = useState(0);
-  const [hover, setHover] = useState(0);
-  const chips = ["👏 Sterk gedaan", "💡 Goede reflectie", "🗣️ Werk aan communicatie", "🚀 Breng het echt uit!"];
-  const [state, setState] = useState<{ status: "idle" | "sending" | "done" | "error"; msg?: string }>({ status: "idle" });
+
+  // Detect a successful return from FormSubmit.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get("feedback") === "sent") {
+      setState({ status: "done" });
+      window.history.replaceState(
+        null,
+        "",
+        window.location.pathname + window.location.hash
+      );
+    }
+  }, []);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+
     const form = e.currentTarget;
     const f = new FormData(form);
+
     setState({ status: "sending" });
+
     try {
-      const res = await send({
+      // First, validate the password on the Vercel server.
+      const result = await validate({
         data: {
           password: String(f.get("password") ?? ""),
-          name: String(f.get("name") ?? ""),
-          module: String(f.get("module") ?? ""),
-          message: (stars ? `Beoordeling: ${"★".repeat(stars)}${"☆".repeat(5 - stars)}\n\n` : "") + String(f.get("message") ?? ""),
         },
       });
-      if (res.ok) { form.reset(); setMessage(""); setStars(0); setState({ status: "done" }); }
-      else setState({ status: "error", msg: res.error });
-    } catch {
-      setState({ status: "error", msg: "Controleer of alle velden goed zijn ingevuld." });
+
+      if (!result.ok) {
+        setState({ status: "error", msg: result.error });
+        return;
+      }
+
+      // Prepare the feedback for a direct browser submission.
+      const feedback =
+        (stars
+          ? `Beoordeling: ${"★".repeat(stars)}${"☆".repeat(5 - stars)}\n\n`
+          : "") + String(f.get("message") ?? "");
+
+      // Create a separate form so the password is NOT sent to FormSubmit.
+      const outbound = document.createElement("form");
+      outbound.method = "POST";
+      outbound.action = "https://formsubmit.co/141383@martinuscollege.nl";
+
+      const fields: Record<string, string> = {
+        _subject: `Portfolio-feedback van ${String(f.get("name"))} (${String(f.get("module"))})`,
+        _template: "table",
+        _next: `${window.location.origin}${window.location.pathname}?feedback=sent#feedback`,
+        Docent: String(f.get("name") ?? ""),
+        Module: String(f.get("module") ?? ""),
+        Feedback: feedback,
+      };
+
+      for (const [name, value] of Object.entries(fields)) {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = name;
+        input.value = value;
+        outbound.appendChild(input);
+      }
+
+      document.body.appendChild(outbound);
+
+      // Submit directly from the visitor's browser to FormSubmit.
+      outbound.submit();
+    } catch (error) {
+      console.error("Feedback error:", error);
+      setState({
+        status: "error",
+        msg: "Er ging iets mis. Probeer het opnieuw.",
+      });
     }
   }
 
-  const input = "w-full border-b border-foreground/30 bg-transparent py-2 outline-none focus:border-primary";
+  const input =
+    "w-full border-b border-foreground/30 bg-transparent py-2 outline-none focus:border-primary";
+
   return (
-    <section id="feedback" className="scroll-reveal grid gap-8 py-16 md:grid-cols-[180px_1fr]">
+    <section
+      id="feedback"
+      className="scroll-reveal grid gap-8 py-16 md:grid-cols-[180px_1fr]"
+    >
       <Label>Voor docenten</Label>
+
       <div>
         <h2 className="text-4xl font-medium">Feedback achterlaten</h2>
-        <p className="mt-3 text-muted-foreground">Je feedback wordt direct naar mij gemaild. Je hebt het wachtwoord nodig dat ik heb meegestuurd.</p>
+
+        <p className="mt-3 text-muted-foreground">
+          Je feedback wordt direct naar mij gemaild. Je hebt het wachtwoord
+          nodig dat ik heb meegestuurd.
+        </p>
+
         {state.status === "done" ? (
-          <p className="mt-10 border-l-2 border-primary pl-4 text-lg">Bedankt, je feedback is verstuurd.</p>
+          <p className="mt-10 border-l-2 border-primary pl-4 text-lg">
+            Bedankt, je feedback is verstuurd.
+          </p>
         ) : (
           <form onSubmit={onSubmit} className="mt-10 space-y-8">
             <div className="grid gap-8 sm:grid-cols-2">
-              <label className="block text-sm">Naam docent<input name="name" required maxLength={100} className={input} /></label>
-              <label className="block text-sm">Module
-                <select name="module" className={input} defaultValue="Module 1">
-                  {modules.map((m) => <option key={m.nr}>Module {m.nr}</option>)}
+              <label className="block text-sm">
+                Naam docent
+                <input
+                  name="name"
+                  required
+                  maxLength={100}
+                  className={input}
+                />
+              </label>
+
+              <label className="block text-sm">
+                Module
+                <select
+                  name="module"
+                  className={input}
+                  defaultValue="Module 1"
+                >
+                  {modules.map((m) => (
+                    <option key={m.nr}>Module {m.nr}</option>
+                  ))}
                   <option>Algemeen</option>
                 </select>
               </label>
             </div>
+
             <div>
               <p className="text-sm">Hoe vind je deze module?</p>
-              <div className="mt-2 flex gap-1" onMouseLeave={() => setHover(0)}>
+
+              <div
+                className="mt-2 flex gap-1"
+                onMouseLeave={() => setHover(0)}
+              >
                 {[1, 2, 3, 4, 5].map((n) => (
-                  <button type="button" key={n} aria-label={`${n} sterren`} onMouseEnter={() => setHover(n)} onClick={() => setStars(n)}
-                    className={`text-3xl transition hover:scale-125 ${n <= (hover || stars) ? "text-primary" : "text-foreground/20"}`}>★</button>
+                  <button
+                    type="button"
+                    key={n}
+                    aria-label={`${n} sterren`}
+                    onMouseEnter={() => setHover(n)}
+                    onClick={() => setStars(n)}
+                    className={`text-3xl transition hover:scale-125 ${
+                      n <= (hover || stars)
+                        ? "text-primary"
+                        : "text-foreground/20"
+                    }`}
+                  >
+                    ★
+                  </button>
                 ))}
-                {stars > 0 && <span className="ml-3 self-center text-sm text-muted-foreground">{["", "Kan beter", "Oké", "Goed", "Heel goed", "Top!"][stars]}</span>}
+
+                {stars > 0 && (
+                  <span className="ml-3 self-center text-sm text-muted-foreground">
+                    {
+                      ["", "Kan beter", "Oké", "Goed", "Heel goed", "Top!"][
+                        stars
+                      ]
+                    }
+                  </span>
+                )}
               </div>
             </div>
+
             <div>
               <p className="text-sm">Snelle reactie</p>
+
               <div className="mt-2 flex flex-wrap gap-2">
                 {chips.map((c) => (
-                  <button type="button" key={c} onClick={() => setMessage((m) => (m ? m + " " : "") + c + ".")}
-                    className="rounded-full border border-foreground/20 px-3 py-1.5 text-sm transition hover:-translate-y-0.5 hover:border-primary hover:bg-secondary active:scale-95">
+                  <button
+                    type="button"
+                    key={c}
+                    onClick={() =>
+                      setMessage((m) => (m ? m + " " : "") + c + ".")
+                    }
+                    className="rounded-full border border-foreground/20 px-3 py-1.5 text-sm transition hover:-translate-y-0.5 hover:border-primary hover:bg-secondary active:scale-95"
+                  >
                     {c}
                   </button>
                 ))}
               </div>
             </div>
-            <label className="block text-sm">Feedback<textarea name="message" value={message} onChange={(e) => setMessage(e.target.value)} required minLength={5} maxLength={5000} rows={5} className={input} /></label>
-            <label className="block max-w-xs text-sm">Wachtwoord<input name="password" type="password" required className={input} /></label>
-            {state.status === "error" && <p className="text-sm text-destructive">{state.msg}</p>}
-            <button disabled={state.status === "sending"} className="bg-foreground px-6 py-3 text-sm font-medium text-background transition hover:bg-primary disabled:opacity-50">
-              {state.status === "sending" ? "Versturen…" : "Verstuur feedback"}
+
+            <label className="block text-sm">
+              Feedback
+              <textarea
+                name="message"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                required
+                minLength={5}
+                maxLength={5000}
+                rows={5}
+                className={input}
+              />
+            </label>
+
+            <label className="block max-w-xs text-sm">
+              Wachtwoord
+              <input
+                name="password"
+                type="password"
+                required
+                className={input}
+              />
+            </label>
+
+            {state.status === "error" && (
+              <p className="text-sm text-destructive">{state.msg}</p>
+            )}
+
+            <button
+              disabled={state.status === "sending"}
+              className="bg-foreground px-6 py-3 text-sm font-medium text-background transition hover:bg-primary disabled:opacity-50"
+            >
+              {state.status === "sending"
+                ? "Versturen…"
+                : "Verstuur feedback"}
             </button>
           </form>
         )}
