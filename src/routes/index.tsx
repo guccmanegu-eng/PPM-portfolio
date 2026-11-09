@@ -173,8 +173,7 @@ function Intro() {
           waar ik groei.
         </p>
         <p className="text-muted-foreground">
-          Het portfolio telt voor 20% mee en loopt door tot en met havo 5. De modules die nog leeg zijn, vul ik in
-          zodra ze klaar zijn.
+          .
         </p>
       </div>
     </section>
