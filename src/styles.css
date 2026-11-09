@@ -1,0 +1,90 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-display: "Newsreader", Georgia, serif;
+  --font-sans: "Inter Tight", system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-ink: var(--ink);
+  --color-ink-foreground: var(--ink-foreground);
+  --color-sun: var(--sun);
+  --color-mint: var(--mint);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+:root {
+  --radius: 0.25rem;
+  --background: oklch(0.975 0.008 90);
+  --foreground: oklch(0.2 0.02 270);
+  --card: oklch(0.995 0.005 85);
+  --card-foreground: oklch(0.2 0.02 270);
+  --popover: oklch(0.995 0.005 85);
+  --popover-foreground: oklch(0.2 0.02 270);
+  --primary: oklch(0.5 0.13 35);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.92 0.03 85);
+  --secondary-foreground: oklch(0.2 0.02 270);
+  --muted: oklch(0.93 0.02 85);
+  --muted-foreground: oklch(0.48 0.02 270);
+  --accent: oklch(0.85 0.1 160);
+  --accent-foreground: oklch(0.2 0.02 270);
+  --ink: oklch(0.2 0.02 270);
+  --ink-foreground: oklch(0.97 0.015 85);
+  --sun: oklch(0.86 0.16 90);
+  --mint: oklch(0.82 0.11 165);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.2 0.02 270 / 12%);
+  --input: oklch(0.2 0.02 270 / 15%);
+  --ring: oklch(0.5 0.13 35);
+  --shadow-pop: 6px 6px 0 0 var(--ink);
+}
+
+@layer base {
+  * { border-color: var(--color-border); }
+  html { scroll-behavior: smooth; }
+  body { background-color: var(--color-background); color: var(--color-foreground); font-family: var(--font-sans); }
+  h1, h2, h3 { font-family: var(--font-display); }
+}
+
+@utility shadow-pop { box-shadow: 4px 4px 0 0 var(--primary); }
+@utility reveal { animation: rise 0.7s ease-out both; }
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+@utility float-slow { animation: floaty 7s ease-in-out infinite; }
+@utility float-fast { animation: floaty 4.5s ease-in-out infinite reverse; }
+@keyframes floaty { 0%,100% { transform: translate(0,0) rotate(0); } 50% { transform: translate(10px,-18px) rotate(8deg); } }
+@utility marquee { animation: marquee 28s linear infinite; }
+@keyframes marquee { to { transform: translateX(-50%); } }
+@utility letter-pop { display: inline-block; animation: pop 0.6s cubic-bezier(.3,1.6,.5,1) both; }
+@keyframes pop { from { opacity: 0; transform: translateY(40px) rotate(-8deg); } to { opacity: 1; transform: none; } }
+@utility scroll-reveal {
+  opacity: 0; transform: translateY(40px); transition: opacity .8s ease, transform .8s cubic-bezier(.2,.8,.2,1);
+  &.is-visible { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .float-slow, .float-fast, .marquee, .letter-pop { animation: none; }
+  .scroll-reveal { opacity: 1; transform: none; }
+}
